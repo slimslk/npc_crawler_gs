@@ -1,22 +1,26 @@
 import inspect
 import random
 
+from errors.action_errors import IncorrectActionValues
 from game.item.corpse import Corpse
 from game.map import Map
 from game.item.def_object import DefaultObject
-from game.errors import InvalidActionNameError, InvalidActionParametersError
-from config.configuration import game_tick
 from game.game_observer import GameObjectObserver
+from config.settings import settings
+
+DEFAULT_ACTION = "do_nothing"
 
 
 class Player:
-    __MAX_HEALTH = 25
-    __MAX_ENERGY = 100
-    __MAX_HUNGRY = (10 * 60 * 1000) / game_tick  # The player can survive for 10 minutes with a full hunger bar.
+    __GAME_TICK = settings.game.tick
+    __MAX_HEALTH = settings.player.max_health
+    __MAX_ENERGY = settings.player.max_energy
+    __MAX_HUNGRY = settings.player.max_hungry / __GAME_TICK
     __is_solid: bool = True
+    char_id: int = -1
 
     def __init__(self, user_id, name):
-        self.id = user_id
+        self.user_id = user_id
         self.name = name
         self.pos_x = 0
         self.pos_y = 0
@@ -27,20 +31,18 @@ class Player:
         self.direction = (0, -1)
         self.inventory: list[DefaultObject] = []
         self.is_dead = False
-        self.defence = 8
-        self.attack_modifier = 0
-        self.attack_damage = 4
+        self.defence = settings.player.default_defence
+        self.attack_modifier = settings.player.default_attack_modifier
+        self.attack_damage = settings.player.default_attack_damage
         self.skip_counter = 0
         self.observers: set[GameObjectObserver] = set()
+        self.is_sleep: bool = False
 
     def add_observer(self, observer: GameObjectObserver):
         self.observers.add(observer)
 
     def remove_observer(self, observer: GameObjectObserver):
         self.observers.remove(observer)
-
-    def is_solid(self):
-        return self.__is_solid
 
     def set_position(self, x, y):
         self.pos_x = x
@@ -61,6 +63,8 @@ class Player:
     async def set_map(self, world: Map):
         self.world = world
         await self.notify_observers()
+
+    # =========== Action methods =============== #
 
     async def increase_hungry(self, amount: int):
         amount = int(amount)
@@ -168,10 +172,10 @@ class Player:
             self.inventory.append(item)
             await self.notify_observers()
 
-    def show_list_of_items(self, amount=-1):
-        amount = int(amount)
+    def show_list_of_items(self, amount: int = -1):
         if not len(self.inventory):
             return "-" * 10
+        amount = amount if amount < len(self.inventory) else len(self.inventory)
         return ", ".join([f"{index}: {item.get_name()}" for
                           index, item in enumerate(self.inventory[0:amount], start=1)])
 
@@ -188,7 +192,8 @@ class Player:
             await self.do_action(action)
         await self.notify_observers()
 
-    async def attack(self, power: tuple[int, int] = (0, 4), direction: tuple[int, int] = None):
+    async def attack(self, direction: tuple[int, int] = None):
+        power = (self.attack_modifier, self.attack_damage)
         await self.decrease_energy(1)
         if direction:
             obj = self.world.get_first_object(self.pos_x + direction[0], self.pos_y + direction[1])
@@ -208,7 +213,7 @@ class Player:
         await self.notify_observers()
 
     async def skip_turn(self):
-        if self.skip_counter <= (5 * 1000) / game_tick:
+        if self.skip_counter <= (5 * 1000) / self.__GAME_TICK:
             self.skip_counter += 1
         else:
             await self.increase_energy(1)
@@ -217,14 +222,22 @@ class Player:
     async def do_nothing(self):
         await self.skip_turn()
 
+    async def sleep(self):
+        self.is_sleep = True
+
+    async def awake(self):
+        self.is_sleep = False
+
     async def do_action(self, action: dict):
-        await self.increase_hungry(1)
         if self.__check_is_player_dead():
             return None
-        action_name = action.get("action", "do_nothing")
+        if self.is_sleep and action.get("action") != "awake":
+            return None
+        await self.increase_hungry(1)
+        action_name = action.get("action", DEFAULT_ACTION)
         if action_name != "skip_turn":
             self.skip_counter = 0
-        method = getattr(self, action_name, "do_nothing")
+        method = getattr(self, action_name, DEFAULT_ACTION)
         if method is not None and callable(method):
             try:
                 if inspect.iscoroutinefunction(method):
@@ -232,16 +245,16 @@ class Player:
                 else:
                     result = method(*action.get("params", []))
             except TypeError:
-                raise InvalidActionParametersError(
-                    f"action_name: {action.get(action_name)}, params: {action.get("params")}"
+                raise IncorrectActionValues(
+                    message=f"action_name: {action.get(action_name)}, params: {action.get("params")}"
                 )
         else:
-            raise InvalidActionNameError(action_name)
+            raise IncorrectActionValues(message=action_name)
         return result
 
     def get_player_parameters(self):
         return {
-            "id": self.id,
+            "id": self.char_id,
             "name": self.name,
             "health": self.health,
             "energy": self.energy,
@@ -253,7 +266,8 @@ class Player:
             "attack_modifier": self.attack_modifier,
             "attack_damage": self.attack_damage,
             "defence": self.defence,
-            "is_dead": self.is_dead
+            "is_dead": self.is_dead,
+            "is_sleep": self.is_sleep
         }
 
     async def process_death(self):
@@ -277,6 +291,6 @@ class Player:
         return f"Player: {self.name}"
 
     async def notify_observers(self):
-        data = {self.id: self.get_player_parameters()}
+        data = {self.user_id: self.get_player_parameters()}
         for observer in self.observers:
             await observer.update(data)

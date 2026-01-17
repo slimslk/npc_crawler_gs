@@ -1,7 +1,7 @@
 import copy
 import random
 
-from game.errors import PositionIsOccupiedError
+from errors.errors import PositionIsOccupiedError
 from game.item.dummy import Dummy
 from game.item.grass import Grass
 from game.item.meat import Meat
@@ -32,7 +32,7 @@ async def add_objects_to_map_in_random_places(location, object_type, amount: int
         i += 1
 
 
-async def generate_main_location():
+async def generate_main_location() -> Location:
     location_height = 100
     location_width = 100
     tree_coefficient = 0.2
@@ -63,7 +63,7 @@ async def generate_main_location():
     return main_location
 
 
-async def generate_location(height: int, width: int, name: str):
+async def generate_location(height: int, width: int, name: str) -> Location:
     grass_map = [[[Grass()] for _ in range(width)] for _ in range(height)]
     main_map = Map(grass_map)
     location = Location(main_map, name)

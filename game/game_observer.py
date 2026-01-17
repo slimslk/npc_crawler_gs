@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 
 from game.queue_wrapper import DefaultBufferQueue
-from config.configuration import location_updates_topic, player_updates_topic
+from config.settings import settings
 
 
 class GameObjectObserver(ABC):
@@ -14,6 +14,7 @@ class GameObjectObserver(ABC):
 class KafkaMapObserver(GameObjectObserver):
     __updated_data_map: dict[str: dict[tuple, str]] = {}
     __old_map_data: dict[datetime, dict] = {}
+    __LOCATION_UPDATES_TOPIC = settings.topic.location_update_kafka_topic
 
     def __init__(self, output_queue: DefaultBufferQueue):
         self._output_queue = output_queue
@@ -39,7 +40,7 @@ class KafkaMapObserver(GameObjectObserver):
 
     def _build_message(self, map_id, map_data) -> dict[str: object]:
         msg = {
-            "topic": location_updates_topic,
+            "topic": self.__LOCATION_UPDATES_TOPIC,
             "key": map_id,
             "value": map_data
         }
@@ -47,6 +48,7 @@ class KafkaMapObserver(GameObjectObserver):
 
 
 class KafkaPlayerObserver(GameObjectObserver):
+    __PLAYER_UPDATES_TOPIC = settings.topic.player_update_kafka_topic
 
     def __init__(self, output_queue: DefaultBufferQueue):
         self._output_queue = output_queue
@@ -61,7 +63,7 @@ class KafkaPlayerObserver(GameObjectObserver):
 
     def _build_message(self, user_id, player_data) -> dict[str: object]:
         msg = {
-            "topic": player_updates_topic,
+            "topic": self.__PLAYER_UPDATES_TOPIC,
             "key": user_id,
             "value": player_data
         }

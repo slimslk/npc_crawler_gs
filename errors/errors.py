@@ -8,14 +8,14 @@ class PlayerIsDeadError(DefaultError):
         super().__init__(f'Player {name} has dead!')
 
 
-class InvalidActionNameError(DefaultError):
-    def __init__(self, name):
-        super().__init__(f'Invalid action name: {name}')
+# class InvalidActionNameError(DefaultError):
+#     def __init__(self, name):
+#         super().__init__(f'Invalid action name: {name}')
 
 
-class InvalidActionParametersError(DefaultError):
-    def __init__(self, name):
-        super().__init__(f'Invalid action name: {name}')
+# class InvalidActionParametersError(DefaultError):
+#     def __init__(self, name):
+#         super().__init__(f'Invalid action name: {name}')
 
 
 class ObjectPositionIsOutOfBoundsError(DefaultError):

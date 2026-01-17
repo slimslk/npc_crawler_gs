@@ -6,11 +6,7 @@ from aiokafka import AIOKafkaProducer
 
 from game.game_app import Main
 from game.queue_wrapper import DefaultBufferQueue
-from config.configuration import (kafka_default_config,
-                                  kafka_producer_config,
-                                  location_updates_topic,
-                                  game_updates_topic,
-                                  player_updates_topic)
+from config.settings import settings, producer_kafka_settings
 
 
 class AIOGameMapKafkaProducer:
@@ -19,6 +15,9 @@ class AIOGameMapKafkaProducer:
     _initialized = False
     _is_running = False
     _kafka_config = {}
+    _player_updates_topic: str
+    _location_updates_topic: str
+    _game_updates_topic: str
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -33,19 +32,15 @@ class AIOGameMapKafkaProducer:
             self.tick = tick
             self.producer = None
             self._output_queue = output_queue
-            self._kafka_config = self._get_kafka_config().copy()
-            self._kafka_config["acks"] = kafka_producer_config["acks"]
-            self._kafka_config["client_id"] = kafka_producer_config["client_id"]
-
             self._initialized = True
-
-    def _get_kafka_config(self):
-        return kafka_default_config
+            self._player_updates_topic = settings.topic.player_update_kafka_topic
+            self._location_updates_topic = settings.topic.location_update_kafka_topic
+            self._game_updates_topic = settings.topic.game_update_kafka_topic
 
     async def start(self):
         if not self._is_running:
             try:
-                self.producer = AIOKafkaProducer(**self._kafka_config)
+                self.producer = AIOKafkaProducer(**producer_kafka_settings.get_config())
                 await self.producer.start()
             except Exception as err:
                 print(f"Producer Kafka error: {err}")
@@ -62,11 +57,11 @@ class AIOGameMapKafkaProducer:
 
                 try:
                     for topic, data in buffer.items():
-                        if topic == player_updates_topic:
+                        if topic == self._player_updates_topic:
                             await self._send_player_updates(data)
-                        elif topic == location_updates_topic:
+                        elif topic == self._location_updates_topic:
                             await self._send_location_updates(data)
-                        elif topic == game_updates_topic:
+                        elif topic == self._game_updates_topic:
                             await self._send_game_updates(data)
                     self.game.unlock_all_users()
                 except Exception as err:
@@ -84,11 +79,11 @@ class AIOGameMapKafkaProducer:
 
     async def _send_game_updates(self, data):
         for key, value in data.items():
-            await self._send_message(game_updates_topic, key, value)
+            await self._send_message(self._game_updates_topic, key, value)
 
     async def _send_location_updates(self, data):
         for key, value in data.items():
-            await self._send_message(location_updates_topic, key, value)
+            await self._send_message(self._location_updates_topic, key, value)
 
     async def _send_player_updates(self, data: dict[str, str]):
         user_ids = self.game.player_controllers.keys()
@@ -100,7 +95,7 @@ class AIOGameMapKafkaProducer:
                 # user_params = player.get_player().get_player_parameters()
                 if user_params is None:
                     continue
-            await self._send_message(player_updates_topic, user_id, user_params)
+            await self._send_message(self._player_updates_topic, user_id, user_params)
 
     async def _send_message(self, topic, key, value):
         encoded_message = self._ecode_message(key, value)

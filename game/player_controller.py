@@ -25,24 +25,30 @@ class PlayerController:
         action = {"action": "move", "params": [(0, 1), steps]}
         await self.__do_action(action)
 
-    async def take_item(self):
-        action = {"action": "take_object", "params": []}
+    async def take_item(self,
+                        direction: tuple[int, int] | None = None):
+        action = {"action": "take_object", "params": [direction]}
         await self.__do_action(action)
 
-    async def get_items_list(self):
-        action = {"action": "show_list_of_items", "params": []}
+    async def list_items(self, amount: int | None = None):
+        action = {"action": "show_list_of_items", "params": [amount]}
         await self.__do_action(action)
 
     async def use_item(self, index: int):
         action = {"action": "use_item", "params": [index]}
         await self.__do_action(action)
 
-    async def attack(self):
-        action = {"action": "attack"}
+    async def attack(self,
+                     direction: tuple[int, int] | None = None):
+        action = {"action": "attack", "params": [direction]}
         await self.__do_action(action)
 
     async def skip_turn(self):
         action = {"action": "skip_turn", "params": []}
+        await self.__do_action(action)
+
+    async def awake(self):
+        action = {"action": "awake", "params": []}
         await self.__do_action(action)
 
     def get_player_info(self):
@@ -57,3 +63,6 @@ class PlayerController:
 # Activities: {"action": "use_item", "params": [1]} - use item under index 1
 # Activities: {"action": "attack", "params": [(0,1)]} - attack in front of the player with power and damage
 # Activities: {"action": "skip_turn", "params": []} - skip turn and restore 1 energy
+
+# (when the character is sleeping, his hunger does not decrease, but also cannot perform any actions).
+# Activities: {"action": "awake", "params": []} - The character can perform action after sleeping

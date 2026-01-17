@@ -3,8 +3,7 @@ import json
 
 from aiokafka import AIOKafkaConsumer
 from aiokafka.errors import KafkaError
-
-from config.configuration import kafka_default_config, kafka_consumer_config, player_event_topic
+from config.settings import settings, consumer_kafka_settings
 
 
 class AIOGameMapKafkaConsumer:
@@ -12,25 +11,15 @@ class AIOGameMapKafkaConsumer:
     _consumer_config = {}
 
     def __init__(self, game_manager):
-        self._consumer_config = self._get_kafka_config().copy()
-        self._consumer_config["group_id"] = kafka_consumer_config["group_id"]
-        self._consumer_config["client_id"] = kafka_consumer_config["client_id"]
-        self._consumer_config["session_timeout_ms"] = kafka_consumer_config["session_timeout_ms"]
-        self._consumer_config["auto_offset_reset"] = kafka_consumer_config["auto_offset_reset"]
-        self._consumer_config["enable_auto_commit"] = kafka_consumer_config["enable_auto_commit"]
-        self.topics = [player_event_topic]
-
+        self.topics = [settings.topic.player_event_kafka_topic]
         self.game_manager = game_manager
         self.consumer: AIOKafkaConsumer | None = None
         self._running = False
 
-    def _get_kafka_config(self):
-        return kafka_default_config
-
     async def start(self):
         if not self._running:
             try:
-                self.consumer = AIOKafkaConsumer(**self._consumer_config)
+                self.consumer = AIOKafkaConsumer(**consumer_kafka_settings.get_config())
                 self.consumer.subscribe(self.topics)
                 await self.consumer.start()
             except KafkaError as err:

@@ -1,7 +1,7 @@
 import threading
 import random
 
-from game.errors import LocationNotFoundError
+from errors.errors import LocationNotFoundError
 from game.location import Location
 from game.game_observer import GameObjectObserver
 from game.player import Player
@@ -25,9 +25,9 @@ class Main:
 
     def __init__(self):
         if not self._initialized:
-            self.locations = {}
+            self.locations: dict[str, Location] = {}
             self.player_controllers: dict[str, PlayerController] = {}
-            self.main_location = None
+            self.main_location: Location | None = None
             self.users: {str: bool} = {}
             self.observers: dict[str, set] = {}
 
@@ -60,49 +60,100 @@ class Main:
         self.main_location = main_location
         return self.main_location
 
-    def get_locations_id(self):
+    def get_locations(self):
         return [location for location in self.locations.keys()]
 
     def get_location(self, location_id):
         return self.locations.get(location_id, self.main_location)
 
     def add_location(self, location):
-        self.locations[location.get_location_id()] = location
+        self.locations[location.get_map().map_id] = location
 
-    async def create_player(self, name, user_id):
+    async def create_player(self, name, user_id) -> Player:
         max_height, max_width = self.main_location.get_location_size()
-        while True:
-            player_coordinates = (random.randint(0, max_height - 1), random.randint(0, max_width - 1))
-            if not self.main_location.get_map().get_first_object(*player_coordinates).is_solid():
+        player = self.__create_default_player(name, user_id)
+        player_coordinates = (random.randint(0, max_width - 1), random.randint(0, max_height - 1))
 
-                player = Player(user_id, name)
-                observers = self.observers.get(self._PLAYER_OBSERVER_NAME, None)
-                if observers:
-                    for observer in observers:
-                        player.add_observer(observer)
+        if self.main_location.get_map().get_first_object(*player_coordinates).is_solid():
+            player_coordinates = self.__find_free_spot(*player_coordinates, location=self.main_location)
+        if player_coordinates:
+            await self.add_player_to_location(player, *player_coordinates,
+                                              location_id=self.main_location.get_map().map_id)
 
-                player_controller = PlayerController(player)
-                self.player_controllers[user_id] = player_controller
-                await self.add_player_to_location(player, *player_coordinates,
-                                                  location_id=self.main_location.get_location_id())
-                break
-        await player.notify_observers()
+        # await player.notify_observers()
+        return player
+
+    async def return_character_to_game(self, player: Player, location_id) -> Player:
+        location = self.get_location(location_id)
+
+        player.world = location.get_map()
+        observers = self.observers.get(self._PLAYER_OBSERVER_NAME, None)
+        if observers:
+            for observer in observers:
+                player.add_observer(observer)
+
+        position = (player.pos_x, player.pos_y)
+
+        if location.get_map().get_first_object(*position).is_solid():
+            position = self.__find_free_spot(*position, location=location)
+
+        await self.add_player_to_location(player, *position,
+                                          location_id=self.get_location(player.world.map_id))
+        await self.create_player_controller(player)
+        return player
+
+    def __find_free_spot(self, start_pos_x: int, start_pos_y: int, location: Location) -> tuple[int, int]:
+        max_x, max_y = location.get_location_size()
+        max_radius = max(max_x, max_y)
+        for radius in range(1, max_radius + 1):
+
+            for dx in range(-radius, radius + 1):
+                for dy in (-radius, radius):
+                    x = start_pos_x + dx
+                    y = start_pos_y + dy
+
+                    if 0 <= x < max_x and 0 <= y < max_y:
+                        if not location.get_map().get_first_object(x, y).is_solid():
+                            return x, y
+
+            for dy in range(-radius + 1, radius):
+                for dx in (-radius, radius):
+                    x = start_pos_x + dx
+                    y = start_pos_y + dy
+
+                    if 0 <= x < max_x and 0 <= y < max_y:
+                        if not location.get_map().get_first_object(x, y).is_solid():
+                            return x, y
+
+        raise RuntimeError("No free position found on the map")
+
+    def __create_default_player(self, name: str, user_id: str) -> Player:
+        player = Player(user_id, name)
+        observers = self.observers.get(self._PLAYER_OBSERVER_NAME, None)
+        if observers:
+            for observer in observers:
+                player.add_observer(observer)
+        return player
+
+    async def create_player_controller(self, player: Player) -> PlayerController:
+        player_controller = PlayerController(player)
+        self.player_controllers[player.user_id] = player_controller
         return player_controller
 
-    def remove_user(self, user_id):
+    def remove_user(self, user_id: str):
         self.users.pop(user_id, None)
         self.player_controllers.pop(user_id, None)
 
-    async def get_player_controller(self, user_id):
+    async def get_player_controller(self, user_id: str) -> PlayerController | None:
         return await self.__check_if_player_exists(user_id)
 
     async def add_player_to_location(self, player, pos_x, pos_y, location_id):
         location = self.__check_if_location_exists(location_id)
         await location.add_player(player, pos_x, pos_y)
 
-    async def remove_player_from_location(self, player_id, location_id):
+    async def remove_player_from_location(self, player: Player, location_id):
         location = self.__check_if_location_exists(location_id)
-        await location.remove_player(player_id)
+        await location.remove_player(player)
 
     def add_map_observer(self, observer: GameObjectObserver):
         self.observers.setdefault(self._MAP_OBSERVER_NAME, set()).add(observer)
@@ -122,6 +173,6 @@ class Main:
             raise LocationNotFoundError(location_id)
         return location
 
-    async def __check_if_player_exists(self, user_id) -> PlayerController | None:
+    async def __check_if_player_exists(self, user_id: str) -> PlayerController | None:
         player_controller = self.player_controllers.get(user_id, None)
         return player_controller

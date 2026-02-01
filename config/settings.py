@@ -119,6 +119,7 @@ class DBSettings(BaseModel):
     echo_pool: bool
     pool_size: int
     max_overflow: int
+    current_schema: str = "public"
 
 
 class Settings(BaseSettings):

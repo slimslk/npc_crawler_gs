@@ -65,7 +65,8 @@ class AIOGameMapKafkaProducer:
                             await self._send_game_updates(data)
                     self.game.unlock_all_users()
                 except Exception as err:
-                    print(f"Kafka error sending message: {err}")
+                    print(f"Kafka producer error sending message: {err}")
+                    raise
 
         except asyncio.CancelledError:
             print("Producer task cancelled.")

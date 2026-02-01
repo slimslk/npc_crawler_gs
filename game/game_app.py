@@ -72,35 +72,41 @@ class Main:
     async def create_player(self, name, user_id) -> Player:
         max_height, max_width = self.main_location.get_location_size()
         player = self.__create_default_player(name, user_id)
+
         player_coordinates = (random.randint(0, max_width - 1), random.randint(0, max_height - 1))
 
         if self.main_location.get_map().get_first_object(*player_coordinates).is_solid():
             player_coordinates = self.__find_free_spot(*player_coordinates, location=self.main_location)
-        if player_coordinates:
-            await self.add_player_to_location(player, *player_coordinates,
-                                              location_id=self.main_location.get_map().map_id)
+        player.pos_x = player_coordinates[0]
+        player.pos_y = player_coordinates[1]
+        # if player_coordinates:
+        #     await self.add_player_to_location(player, *player_coordinates,
+        #                                       location_id=self.main_location.get_map().map_id)
 
         # await player.notify_observers()
         return player
 
     async def return_character_to_game(self, player: Player, location_id) -> Player:
-        location = self.get_location(location_id)
+        location: Location = self.get_location(location_id)
+        player_on_map: Player = location.get_players().get(player.char_id, None)
 
-        player.world = location.get_map()
-        observers = self.observers.get(self._PLAYER_OBSERVER_NAME, None)
-        if observers:
-            for observer in observers:
-                player.add_observer(observer)
+        if not player_on_map:
+            player.world = location.get_map()
+            observers = self.observers.get(self._PLAYER_OBSERVER_NAME, None)
+            if observers:
+                for observer in observers:
+                    player.add_observer(observer)
 
-        position = (player.pos_x, player.pos_y)
-
-        if location.get_map().get_first_object(*position).is_solid():
-            position = self.__find_free_spot(*position, location=location)
-
-        await self.add_player_to_location(player, *position,
-                                          location_id=self.get_location(player.world.map_id))
-        await self.create_player_controller(player)
-        return player
+            position = (player.pos_x, player.pos_y)
+            game_object_on_map = location.get_map().get_first_object(*position)
+            if not isinstance(game_object_on_map, Player) or game_object_on_map.char_id != player.char_id:
+                if location.get_map().get_first_object(*position).is_solid():
+                    position = self.__find_free_spot(*position, location=location)
+                await self.add_player_to_location(player, *position,
+                                                  location_id=self.get_location(player.world.map_id))
+            player_on_map = player
+        await self.create_player_controller(player_on_map)
+        return player_on_map
 
     def __find_free_spot(self, start_pos_x: int, start_pos_y: int, location: Location) -> tuple[int, int]:
         max_x, max_y = location.get_location_size()
@@ -142,7 +148,7 @@ class Main:
 
     def remove_user(self, user_id: str):
         self.users.pop(user_id, None)
-        self.player_controllers.pop(user_id, None)
+        # self.player_controllers.pop(user_id, None)
 
     async def get_player_controller(self, user_id: str) -> PlayerController | None:
         return await self.__check_if_player_exists(user_id)
@@ -170,7 +176,10 @@ class Main:
     def __check_if_location_exists(self, location_id) -> Location:
         location = self.locations.get(location_id, None)
         if location is None:
-            raise LocationNotFoundError(location_id)
+            # TODO: Temporarily, fall back to the main location if the location is missing. Later this will be replaced
+            #  with restoring the location from storage.
+            location = self.main_location
+            # raise LocationNotFoundError(location_id)
         return location
 
     async def __check_if_player_exists(self, user_id: str) -> PlayerController | None:

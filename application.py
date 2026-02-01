@@ -52,7 +52,7 @@ async def main():
         producer_task = asyncio.create_task(kafka_map_producer.run(stop_event))
         consumer_task = asyncio.create_task(kafka_game_event_consumer.run(stop_event))
 
-        result = await asyncio.gather(consumer_task, producer_task, return_exceptions=True)
+        result = await asyncio.gather(consumer_task, producer_task)
         for er in result:
             if isinstance(er, DefaultError):
                 logger.error(f"GameError: {er}")

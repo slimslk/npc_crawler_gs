@@ -33,7 +33,13 @@ class AIOGameMapKafkaConsumer:
                 try:
                     messages = await self.consumer.getmany(timeout_ms=250, max_records=10)
                     if messages:
-                        await self.__process_messages(messages)
+                        try:
+                            await self.__process_messages(messages)
+                        except KafkaError as err:
+                            print(f"Consumer Kafka start error: {err}")
+                        except Exception as err:
+                            print(f"Exception: {err}")
+                            raise
                 except RuntimeError as err:
                     print(f"Consumer Kafka error: {err}")
         except asyncio.CancelledError:

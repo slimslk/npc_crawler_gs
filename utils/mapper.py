@@ -27,6 +27,7 @@ def player_to_player_model(player: Player) -> Character:
 
 def character_model_to_player(character: Character) -> Player:
     player = Player(character.user_id, character.name)
+    player.char_id = character.id
     player.health = character.stats.health
     player.pos_x = character.stats.position_x
     player.pos_y = character.stats.position_y

@@ -10,6 +10,7 @@ class PlayerController:
         return self.__player
 
     async def move_up(self, steps: int = 1):
+        print(steps, "steps")
         action = {"action": "move", "params": [(-1, 0), steps]}
         await self.__do_action(action)
 

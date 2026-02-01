@@ -20,12 +20,12 @@ class Location:
     def get_location_size(self):
         return self.__location_height, self.__location_width
 
-    def get_location_id(self):
-        return self.__location_id
+    # def get_location_id(self):
+    #     return self.__location_id
 
     async def add_player(self, player: Player, x, y):
         if x > self.__location_height or y > self.__location_width:
-            raise PlayerPositionIsOutOfBoundsError(f"Location ID: {self.__location_id}\n x = {x}, y = {y} out of bounds"
+            raise PlayerPositionIsOutOfBoundsError(f"Location ID: {self.__location_map.map_id}\n x = {x}, y = {y} out of bounds"
                                                    f" max_x = {self.__location_height} max_y = {self.__location_width}")
         player.world = self.__location_map
         await self.__location_map.place_object(player, x, y)
@@ -40,7 +40,7 @@ class Location:
     async def add_object_to_world(self, game_object: DefaultObject, pos_x: int, pos_y: int):
         if pos_x > self.__location_height or pos_y > self.__location_width:
             raise ObjectPositionIsOutOfBoundsError(
-                f"{game_object}: Location ID: {self.__location_id}\n x = {pos_x}, y = {pos_y} out of bounds"
+                f"{game_object}: Location ID: {self.__location_map.map_id}\n x = {pos_x}, y = {pos_y} out of bounds"
                 f" max_x = {self.__location_height} max_y = {self.__location_width}")
         obj_on_map = self.__location_map.get_first_object(pos_x, pos_y)
         if obj_on_map.is_solid():

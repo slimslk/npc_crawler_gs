@@ -17,12 +17,20 @@ class DBHelper:
             echo_pool: bool = False,
             pool_size: int = 5,
             max_overflow: int = 10,
+            current_schema: str = "public",
     ) -> None:
+
+        print(f"MER: {type(current_schema)}")
         self.engine = create_async_engine(url,
                                           echo=echo,
                                           echo_pool=echo_pool,
                                           pool_size=pool_size,
-                                          max_overflow=max_overflow)
+                                          max_overflow=max_overflow,
+                                          connect_args={"server_settings": {
+                                              "search_path": current_schema
+                                          }
+                                          }
+                                          )
         self.session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
             bind=self.engine,
             autoflush=False,
@@ -44,4 +52,5 @@ db_helper = DBHelper(
     echo_pool=settings.db.echo_pool,
     pool_size=settings.db.pool_size,
     max_overflow=settings.db.max_overflow,
+    current_schema=settings.db.current_schema,
 )

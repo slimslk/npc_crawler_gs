@@ -126,6 +126,7 @@ class Player:
     Diagonals: (1, 1), (1, -1) , (-1, 1), (-1, -1)"""
 
     async def move(self, direction: tuple[int, int], steps: int):
+        print(steps, "STEPS")
         steps = int(steps)
         if self.energy <= 0:
             return
